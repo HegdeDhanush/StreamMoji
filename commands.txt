@@ -1,0 +1,5 @@
+python3 main.py
+python3 consumer.py
+spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1 src/spark/processor.py
+python3 test_clients.py --num-clients 5 --server-url http://localhost:5000 --min-delay 0.5 --max-delay 2.0
+python3 main_pubsub.py
