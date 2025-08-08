@@ -1,10 +1,11 @@
-from kafka import KafkaProducer
+from kafka import KafkaProducer, KafkaConsumer  # Add KafkaConsumer import
 import json
 import threading
 import time
 
 class MainPublisher:
     def __init__(self, bootstrap_servers, input_topic, output_topics):
+        self.bootstrap_servers = bootstrap_servers  # Store as attribute
         self.producer = KafkaProducer(
             bootstrap_servers=bootstrap_servers,
             value_serializer=lambda v: json.dumps(v).encode('utf-8')
@@ -22,9 +23,15 @@ class MainPublisher:
         # Consume from input topic and distribute
         consumer = KafkaConsumer(
             self.input_topic,
-            bootstrap_servers=self.producer.config['bootstrap.servers'],
+            bootstrap_servers=self.bootstrap_servers,  # Use stored attribute
             value_deserializer=lambda x: json.loads(x.decode('utf-8'))
         )
         
-        for message in consumer:
-            self.distribute_message(message.value)
+        try:
+            for message in consumer:
+                print(f"MainPublisher received: {message.value}")
+                self.distribute_message(message.value)
+        except KeyboardInterrupt:
+            print("MainPublisher stopping...")
+        finally:
+            consumer.close()

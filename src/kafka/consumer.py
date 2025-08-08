@@ -85,7 +85,7 @@ class EmojiConsumer:
 
 def main():
     # Configuration
-    KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+    KAFKA_BOOTSTRAP_SERVERS = "kafka:9092"
     KAFKA_TOPIC = "emoji-topic"  # Make sure this matches your producer topic
     
     # Create and run consumer
