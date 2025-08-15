@@ -1,0 +1,42 @@
+FROM bitnami/spark:3.4.1
+
+USER root
+
+# Install additional packages in the correct Python environment
+RUN /opt/bitnami/python/bin/pip install --no-cache-dir \
+    kafka-python==2.0.2 \
+    python-dotenv==1.0.0
+
+WORKDIR /app
+COPY . .
+
+# Create a startup script that uses spark-submit
+RUN cat > /app/start-spark.sh << 'EOF'
+#!/bin/bash
+echo "Starting Spark processor with spark-submit..."
+
+# Wait for Kafka to be ready
+echo "Waiting for Kafka..."
+until nc -z kafka 29092; do
+  echo "Kafka not ready, waiting..."
+  sleep 2
+done
+echo "Kafka is ready!"
+
+# Use spark-submit to run the processor
+exec /opt/bitnami/spark/bin/spark-submit \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1 \
+  --driver-memory 1g \
+  --executor-memory 1g \
+  --master local[2] \
+  /app/src/spark/processor.py
+EOF
+
+RUN chmod +x /app/start-spark.sh
+
+# Install netcat for Kafka health check
+RUN apt-get update && apt-get install -y netcat-openbsd && rm -rf /var/lib/apt/lists/*
+
+USER 1001
+
+CMD ["/app/start-spark.sh"]

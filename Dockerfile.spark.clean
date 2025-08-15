@@ -1,0 +1,117 @@
+FROM bitnami/spark:3.4.1
+
+USER root
+
+# Install required packages
+RUN /opt/bitnami/python/bin/pip install --no-cache-dir \
+    kafka-python==2.0.2 \
+    python-dotenv==1.0.0
+
+# Install netcat for health checks
+RUN apt-get update && \
+    apt-get install -y netcat-openbsd && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy project files
+COPY . .
+
+# Create Python startup script (no shell script parsing issues)
+COPY <<EOF /app/start_processor.py
+#!/usr/bin/env python3
+import os
+import sys
+import time
+import socket
+import subprocess
+
+def wait_for_kafka():
+    """Wait for Kafka to be ready"""
+    kafka_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'kafka:29092')
+    host, port = kafka_servers.split(':')
+    port = int(port)
+    
+    print(f"⏳ Waiting for Kafka at {host}:{port}...")
+    
+    for attempt in range(30):
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(2)
+            result = sock.connect_ex((host, port))
+            sock.close()
+            
+            if result == 0:
+                print("✅ Kafka is ready!")
+                return True
+            else:
+                print(f"🔄 Attempt {attempt + 1}/30: Kafka not ready...")
+                time.sleep(2)
+        except Exception as e:
+            print(f"🔄 Attempt {attempt + 1}/30: {e}")
+            time.sleep(2)
+    
+    print("❌ Kafka not available after 60 seconds")
+    return False
+
+def main():
+    print("🚀 Starting Spark Processor...")
+    print(f"📡 Environment: {os.getenv('ENVIRONMENT')}")
+    print(f"🔗 Kafka: {os.getenv('KAFKA_BOOTSTRAP_SERVERS')}")
+    
+    # Wait for Kafka
+    if not wait_for_kafka():
+        sys.exit(1)
+    
+    # Skip PySpark import test - let spark-submit handle the environment
+    print("🚀 Starting processor with spark-submit (spark-submit will handle PySpark setup)...")
+    
+    # Create checkpoint directory
+    os.makedirs('/app/checkpoint', exist_ok=True)
+    
+    # Run with spark-submit
+    cmd = [
+        '/opt/bitnami/spark/bin/spark-submit',
+        '--packages', 'org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1',
+        '--driver-memory', '1g',
+        '--executor-memory', '1g',
+        '--master', 'local[2]',
+        '--conf', 'spark.sql.streaming.checkpointLocation=/app/checkpoint',
+        '--conf', 'spark.driver.host=localhost',
+        '--conf', 'spark.driver.bindAddress=0.0.0.0',
+        '--conf', 'spark.sql.adaptive.enabled=false',
+        '--conf', 'spark.sql.adaptive.coalescePartitions.enabled=false',
+        '--conf', 'spark.serializer=org.apache.spark.serializer.KryoSerializer',
+        '/app/src/spark/processor.py'
+    ]
+    
+    print(f"🚀 Running command:")
+    print(f"   {' '.join(cmd)}")
+    
+    # Set environment variables for spark-submit
+    env = os.environ.copy()
+    env['PYTHONPATH'] = '/app'
+    
+    # Use subprocess instead of exec to get better error handling
+    try:
+        result = subprocess.run(cmd, env=env, check=True)
+        print("✅ Spark processor completed successfully")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Spark processor failed with exit code {e.returncode}")
+        sys.exit(e.returncode)
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
+EOF
+
+# Set up permissions
+RUN mkdir -p /app/checkpoint /app/spark-checkpoint && \
+    chown -R 1001:1001 /app && \
+    chmod +x /app/start_processor.py
+
+USER 1001
+
+CMD ["/opt/bitnami/python/bin/python", "/app/start_processor.py"]
