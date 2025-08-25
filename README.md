@@ -314,11 +314,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Docker** for containerization platform
 - Open source community for inspiration
 
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/HegdeDhanush/StreamMoji/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/HegdeDhanush/StreamMoji/discussions)
-- **Documentation**: [Wiki](https://github.com/HegdeDhanush/StreamMoji/wiki)
 
 ---
 
