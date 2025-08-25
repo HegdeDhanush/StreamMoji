@@ -2,10 +2,7 @@
 # src/utils/config.py
 
 import os
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
+import sys
 
 class Config:
     # API Settings
@@ -34,3 +31,15 @@ class Config:
     def get_kafka_servers_string(cls):
         """Return Kafka servers as comma-separated string for Spark"""
         return ','.join(cls.KAFKA_BOOTSTRAP_SERVERS)
+    
+    @classmethod
+    def print_config(cls):
+        """Print current configuration for debugging"""
+        print("🔧 EmoStream Configuration:")
+        print(f"   Environment: {cls.ENVIRONMENT}")
+        print(f"   API Host: {cls.API_HOST}:{cls.API_PORT}")
+        print(f"   Kafka Servers: {cls.KAFKA_BOOTSTRAP_SERVERS}")
+        print(f"   Kafka Topic: {cls.KAFKA_EMOJI_TOPIC}")
+        print(f"   Kafka Bootstrap Servers ENV: {os.getenv('KAFKA_BOOTSTRAP_SERVERS')}")
+        print(f"   Current working directory: {os.getcwd()}")
+        print(f"   Python path: {sys.path[:3]}...")  # Show first 3 paths
